@@ -1,10 +1,10 @@
 import { FormEvent, useEffect, useState } from 'react'
-import { Info } from 'lucide-react'
+import { BrainCircuit, Info } from 'lucide-react'
 import {
   Area, AreaChart, Line, LineChart,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
-import { dashboardApi, type ActivityReport } from '../api/dashboardApi'
+import { dashboardApi, type ActivityReport, type CognitiveModelStatus, type CognitiveScreeningResult } from '../api/dashboardApi'
 import { EmptyState, ErrorState, LoadingState } from '../components/ui/AsyncState'
 
 type Preset = '7d' | '30d' | '90d' | 'custom'
@@ -36,6 +36,11 @@ export function ReportsPage({ patientId }: { patientId?: string }) {
   const [to, setTo]           = useState('')
   const [activityId, setActivityId] = useState('')
   const [preset, setPreset]   = useState<Preset>('30d')
+  const [modelStatus, setModelStatus] = useState<CognitiveModelStatus | null>(null)
+  const [screening, setScreening] = useState({ age: '', yearsSchooling: '', literacy: '', residence: '', state: '' })
+  const [screeningResult, setScreeningResult] = useState<CognitiveScreeningResult | null>(null)
+  const [screeningError, setScreeningError] = useState('')
+  const [screeningBusy, setScreeningBusy] = useState(false)
 
   const applyAndLoad = async (fromVal: string, toVal: string, actId: string) => {
     if (!patientId) return
@@ -59,7 +64,32 @@ export function ReportsPage({ patientId }: { patientId?: string }) {
     const { from: f, to: t } = applyPreset('30d')
     setFrom(f); setTo(t)
     void applyAndLoad(f, t, '')
+    if (patientId) {
+      void Promise.all([dashboardApi.patient(patientId), dashboardApi.cognitiveModelStatus(patientId)])
+        .then(([patient, status]) => {
+          setScreening(current => ({ ...current, age: String(patient.age) }))
+          setModelStatus(status)
+        })
+        .catch(() => setModelStatus(null))
+    }
   }, [patientId])
+
+  const runScreening = async (event: FormEvent) => {
+    event.preventDefault()
+    if (!patientId) return
+    setScreeningBusy(true); setScreeningError(''); setScreeningResult(null)
+    try {
+      setScreeningResult(await dashboardApi.cognitiveScreening(patientId, {
+        age: screening.age ? Number(screening.age) : null,
+        years_schooling: screening.yearsSchooling ? Number(screening.yearsSchooling) : null,
+        literacy: screening.literacy ? Number(screening.literacy) : null,
+        residence: screening.residence ? Number(screening.residence) : null,
+        state: screening.state || null,
+      }))
+    } catch (cause) {
+      setScreeningError(cause instanceof Error ? cause.message : 'Unable to generate the research estimate.')
+    } finally { setScreeningBusy(false) }
+  }
 
   const handlePreset = (p: Preset) => {
     setPreset(p)
@@ -123,6 +153,37 @@ export function ReportsPage({ patientId }: { patientId?: string }) {
             <button className="quiet" onClick={() => window.print()} aria-label="Print report">
               Print
             </button>
+          </div>
+        )}
+      </div>
+
+      <div className="research-model-card" aria-labelledby="research-model-heading">
+        <div className="research-model-heading">
+          <BrainCircuit size={24} aria-hidden="true" />
+          <div>
+            <h3 id="research-model-heading">LASI cognitive research estimate</h3>
+            <p>Optional research support only. This does not diagnose dementia or recommend treatment.</p>
+          </div>
+        </div>
+        {modelStatus && !modelStatus.available ? (
+          <p className="auth-error" role="status">The research model is not installed on this server.</p>
+        ) : (
+          <form className="config-form research-model-form" onSubmit={runScreening}>
+            <label>Age<input type="number" min="0" max="130" required value={screening.age} onChange={e => setScreening({ ...screening, age: e.target.value })} /></label>
+            <label>Years of schooling<input type="number" min="0" max="100" value={screening.yearsSchooling} onChange={e => setScreening({ ...screening, yearsSchooling: e.target.value })} /></label>
+            <label>Literacy<select value={screening.literacy} onChange={e => setScreening({ ...screening, literacy: e.target.value })}><option value="">Unknown</option><option value="1">Yes</option><option value="2">No</option></select></label>
+            <label>Residence<select value={screening.residence} onChange={e => setScreening({ ...screening, residence: e.target.value })}><option value="">Unknown</option><option value="1">Rural</option><option value="2">Urban</option></select></label>
+            <label>State<input maxLength={100} value={screening.state} onChange={e => setScreening({ ...screening, state: e.target.value })} placeholder="Maharashtra" /></label>
+            <button className="auth-submit" disabled={screeningBusy || modelStatus?.available === false}>{screeningBusy ? 'Calculating…' : 'Generate estimate'}</button>
+          </form>
+        )}
+        <p className="research-consent-note">Patient consent for cognitive screening is required. Inputs are not stored; generation is audit logged.</p>
+        {screeningError && <p className="auth-error" role="alert">{screeningError}</p>}
+        {screeningResult && (
+          <div className="research-result" role="status">
+            <strong>{Math.round(screeningResult.low_delayed_recall_probability * 100)}%</strong>
+            <span>model-estimated likelihood of matching the LASI low delayed-recall pattern</span>
+            <small>{screeningResult.disclaimer}</small>
           </div>
         )}
       </div>

@@ -38,12 +38,16 @@ services:
       SMS_GATEWAY_URL: ${SMS_GATEWAY_URL:-}
       SMS_GATEWAY_TOKEN_FILE: /run/secrets/sms_gateway_token
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      COGNITIVE_MODEL_PATH: /run/models/lasi_low_recall_calibrated.joblib
+      COGNITIVE_MODEL_SHA256: ${COGNITIVE_MODEL_SHA256:?set COGNITIVE_MODEL_SHA256}
     secrets: &backend_secrets
       - database_url
       - redis_url
       - jwt_secret
       - smtp_password
       - sms_gateway_token
+    volumes:
+      - ${COGNITIVE_MODEL_HOST_PATH:?set COGNITIVE_MODEL_HOST_PATH}:/run/models/lasi_low_recall_calibrated.joblib:ro
     depends_on:
       db:
         condition: service_healthy

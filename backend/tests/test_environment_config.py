@@ -36,6 +36,8 @@ def test_deployment_requires_account_email_configuration(monkeypatch, missing):
         "SMS_GATEWAY_URL": "https://sms.example/messages",
         "SMS_GATEWAY_TOKEN": "test-provider-token",
         "OTEL_EXPORTER_OTLP_ENDPOINT": "http://otel:4318",
+        "COGNITIVE_MODEL_PATH": "/run/models/model.joblib",
+        "COGNITIVE_MODEL_SHA256": "a" * 64,
     }
     values.pop(missing)
     monkeypatch.setenv("APP_ENV", "production")
@@ -79,6 +81,8 @@ def test_deployment_rejects_unsafe_credentials_and_database(
         "SMS_GATEWAY_URL": "https://sms.example/messages",
         "SMS_GATEWAY_TOKEN": "test-provider-token",
         "OTEL_EXPORTER_OTLP_ENDPOINT": "http://otel:4318",
+        "COGNITIVE_MODEL_PATH": "/run/models/model.joblib",
+        "COGNITIVE_MODEL_SHA256": "a" * 64,
         **overrides,
     }
     result = subprocess.run(
@@ -101,6 +105,32 @@ def test_deployment_requires_redis(monkeypatch):
     monkeypatch.setenv("SMS_GATEWAY_URL", "https://sms.example/messages")
     monkeypatch.setenv("SMS_GATEWAY_TOKEN", "test-provider-token")
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://otel:4318")
+    monkeypatch.setenv("COGNITIVE_MODEL_PATH", "/run/models/model.joblib")
+    monkeypatch.setenv("COGNITIVE_MODEL_SHA256", "a" * 64)
     monkeypatch.delenv("REDIS_URL", raising=False)
     with pytest.raises(RuntimeError, match="REDIS_URL"):
+        runpy.run_path(str(CONFIG))
+
+
+@pytest.mark.parametrize(
+    "model_path,checksum",
+    [("", "a" * 64), ("/run/models/model.joblib", "not-a-sha256")],
+)
+def test_deployment_requires_verified_cognitive_model(monkeypatch, model_path, checksum):
+    values = {
+        "APP_ENV": "production",
+        "CORS_ORIGINS": "https://care.example",
+        "SMTP_HOST": "smtp.example",
+        "SMTP_FROM": "no-reply@example.com",
+        "PUBLIC_WEB_URL": "https://care.example",
+        "REDIS_URL": "redis://redis:6379/0",
+        "SMS_GATEWAY_URL": "https://sms.example/messages",
+        "SMS_GATEWAY_TOKEN": "test-provider-token",
+        "OTEL_EXPORTER_OTLP_ENDPOINT": "http://otel:4318",
+        "COGNITIVE_MODEL_PATH": model_path,
+        "COGNITIVE_MODEL_SHA256": checksum,
+    }
+    for key, value in values.items():
+        monkeypatch.setenv(key, value)
+    with pytest.raises(RuntimeError, match="COGNITIVE_MODEL"):
         runpy.run_path(str(CONFIG))

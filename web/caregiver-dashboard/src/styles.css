@@ -970,6 +970,25 @@ button.contact-row:hover { background: var(--bg-raised); border-radius: var(--ra
 }
 .data-freshness-banner svg { color: var(--accent); flex: none; margin-top: 1px; }
 
+.research-model-card {
+  margin: 0 0 24px;
+  padding: 20px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, var(--accent-dim), rgba(52, 201, 160, 0.06));
+}
+.research-model-heading { display: flex; align-items: flex-start; gap: 12px; }
+.research-model-heading svg { color: var(--accent); flex: none; }
+.research-model-heading h3 { margin: 0 0 4px; }
+.research-model-heading p,
+.research-consent-note { margin: 0; color: var(--text-muted); font-size: 0.82rem; }
+.research-model-form { grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 18px 0 10px; }
+.research-model-form .auth-submit { align-self: end; height: 44px; margin: 0; }
+.research-result { display: grid; gap: 3px; margin-top: 14px; padding: 14px; border-radius: var(--radius-md); background: var(--bg-raised); }
+.research-result strong { color: var(--accent); font-size: 1.5rem; }
+.research-result span { color: var(--text-primary); }
+.research-result small { color: var(--text-muted); }
+
 /* ---- Medication Note -------------------------------------- */
 .medication-note {
   background: var(--amber-dim);
@@ -1256,6 +1275,7 @@ button.contact-row:hover { background: var(--bg-raised); border-radius: var(--ra
 }
 
 @media (max-width: 680px) {
+  .research-model-form { grid-template-columns: 1fr; }
   aside {
     display: flex;
     position: fixed;

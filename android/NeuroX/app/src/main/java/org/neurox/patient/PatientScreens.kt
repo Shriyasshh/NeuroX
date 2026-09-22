@@ -609,6 +609,7 @@ internal fun Profile(
                 "voice_recording" to "Store voice recordings",
                 "notifications" to "Send caregiver notifications",
                 "personalization" to "Personalize activities",
+                "cognitive_screening" to "Allow research cognitive estimates",
             ).forEach { (purpose, label) ->
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(label, Modifier.weight(1f), fontSize = 14.sp)

@@ -30,6 +30,8 @@ DEMO_CAREGIVER_PASSWORD = os.getenv("DEMO_CAREGIVER_PASSWORD", "NeuroXDemo!2026"
 DEMO_PATIENT_EMAIL = os.getenv("DEMO_PATIENT_EMAIL", "maya@neurox.demo").strip().lower()
 DEMO_PATIENT_PASSWORD = os.getenv("DEMO_PATIENT_PASSWORD", DEMO_CAREGIVER_PASSWORD)
 REDIS_URL = setting("REDIS_URL")
+COGNITIVE_MODEL_PATH = os.getenv("COGNITIVE_MODEL_PATH", "").strip()
+COGNITIVE_MODEL_SHA256 = os.getenv("COGNITIVE_MODEL_SHA256", "").strip().lower()
 FCM_ENABLED = os.getenv("FCM_ENABLED", "false").lower() == "true"
 BHASHINI_ENABLED = os.getenv("BHASHINI_ENABLED", "false").lower() == "true"
 if FCM_ENABLED:
@@ -73,6 +75,14 @@ if APP_ENV in {"staging", "production"}:
     if not REDIS_URL or not REDIS_URL.startswith(("redis://", "rediss://")):
         raise RuntimeError(
             "A redis:// or rediss:// REDIS_URL is required outside development."
+        )
+    if not COGNITIVE_MODEL_PATH:
+        raise RuntimeError("COGNITIVE_MODEL_PATH is required outside development.")
+    if len(COGNITIVE_MODEL_SHA256) != 64 or any(
+        character not in "0123456789abcdef" for character in COGNITIVE_MODEL_SHA256
+    ):
+        raise RuntimeError(
+            "COGNITIVE_MODEL_SHA256 must be a lowercase 64-character SHA-256 digest outside development."
         )
     public_web_url = os.getenv("PUBLIC_WEB_URL", "")
     parsed_web_url = urlsplit(public_web_url)

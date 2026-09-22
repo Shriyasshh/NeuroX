@@ -15,6 +15,9 @@ and initial availability/error-rate alerts.
 2. Set `NEUROX_DOMAIN`, SMTP sender/host, SMS gateway URL, and a Redis password in
    the deployment environment. The URLs stored in the database/Redis secrets must
    match those credentials.
+   Set `COGNITIVE_MODEL_HOST_PATH` to the absolute path of the calibrated model
+   artifact and `COGNITIVE_MODEL_SHA256` to its SHA-256 digest. The API refuses
+   readiness if the mounted artifact is absent or has a different digest.
 3. Validate the compose model, build immutable images, run the one-shot `migrate`
    job, then start the remaining services. Confirm `/health`, `/ready`, and the
    dashboard through the public HTTPS hostname.

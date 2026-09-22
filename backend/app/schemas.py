@@ -225,6 +225,7 @@ CONSENT_PURPOSES = {
     "caregiver_access",
     "notifications",
     "personalization",
+    "cognitive_screening",
 }
 
 

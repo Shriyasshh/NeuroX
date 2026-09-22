@@ -1,0 +1,6 @@
+# Optional research/model-building dependencies; keep separate from the API runtime.
+pandas>=2.2,<4.0
+numpy>=2.0,<3.0
+scikit-learn>=1.5,<2.0
+pyreadstat>=1.2,<2.0
+joblib>=1.4,<2.0

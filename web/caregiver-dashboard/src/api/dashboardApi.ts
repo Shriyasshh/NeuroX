@@ -5,6 +5,8 @@ export type ActivityReport = { patientId: string; truncated?: boolean; generated
 export type ActivityHistory = { id: string; activityId: string; startedAt: string; completedAt: string | null; accuracy: number | null; responseTime: number | null; attempts: number; status: string; difficulty: number }
 export type DashboardAlert = { id: string; kind: string; type?: string; severity?: string; status: string; message: string; createdAt: string; escalatedToPriority: number; workflowNote?: string }
 export type LocationHistoryItem = { id: string; latitude: number; longitude: number; accuracyM: number; connectionState: string; capturedAt: string; freshness: string; label: string }
+export type CognitiveModelStatus = { available: boolean; model: string; disclaimer: string }
+export type CognitiveScreeningResult = { patientId: string; low_delayed_recall_probability: number; model: string; target: string; disclaimer: string }
 
 export const authApi = {
   login: (email: string, password: string) => api.post<AuthResponse>('/auth/browser/login', {email, password}),
@@ -58,4 +60,6 @@ export const dashboardApi = {
   updateReminder: (reminderId: string, payload: unknown) => api.put<Reminder>(`/api/v1/reminders/${reminderId}`, payload),
   createContact: (patientId: string, payload: unknown) => api.post<Contact>(`/api/v1/patients/${patientId}/emergency-contacts`, payload),
   updateContact: (patientId: string, contactId: string, payload: unknown) => api.put<Contact>(`/api/v1/patients/${patientId}/emergency-contacts/${contactId}`, payload),
+  cognitiveModelStatus: (patientId: string) => api.get<CognitiveModelStatus>(`/api/v1/patients/${patientId}/cognitive-model/status`),
+  cognitiveScreening: (patientId: string, payload: unknown) => api.post<CognitiveScreeningResult>(`/api/v1/patients/${patientId}/cognitive-screening`, payload),
 }

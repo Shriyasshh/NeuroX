@@ -78,3 +78,4 @@ def limit(scope: str, requests: int, window_seconds: int) -> Callable:
 login_limit = limit("login", requests=10, window_seconds=60)
 registration_limit = limit("registration", requests=5, window_seconds=900)
 recovery_limit = limit("account_recovery", requests=5, window_seconds=900)
+cognitive_screening_limit = limit("cognitive_screening", requests=10, window_seconds=3600)

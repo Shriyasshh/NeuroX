@@ -58,5 +58,8 @@ temp/
 data/raw/
 data/processed/
 data/derived/
+# Downloaded research datasets (including LASI) stay local and out of Git.
+data/*/
 data/*.zip
 data/*.tar.gz
+models/
