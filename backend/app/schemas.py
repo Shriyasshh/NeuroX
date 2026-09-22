@@ -242,6 +242,21 @@ class ConsentUpdate(BaseModel):
         return value
 
 
+class SpeechTranscriptionRequest(BaseModel):
+    """Short, ephemeral speech clip sent by the authenticated patient app."""
+
+    audio_base64: str = Field(min_length=60, max_length=1_000_000)
+    language_code: str = Field(pattern=r"^[a-z]{2,3}-[A-Z]{2}$")
+    audio_format: str = Field(default="wav", pattern="^wav$")
+    sampling_rate: int = Field(default=16000, ge=8000, le=48000)
+
+
+class SpeechTranscriptionResponse(BaseModel):
+    transcript: str
+    provider: str
+    retained: bool = False
+
+
 class LocationSharingUpdate(BaseModel):
     enabled: bool
 

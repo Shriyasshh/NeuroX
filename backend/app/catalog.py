@@ -61,7 +61,7 @@ LANGUAGE_CONFIG = [
         "ttsSupported": False,
         "ttsFallbackNote": "Voice guides will use English until an Assamese voice pack is installed.",
         "bhashinSupported": True,
-        "bhashinNote": "Enhanced Assamese speech recognition is available via BHASHINI. Configure a BHASHINI API key to activate it.",
+        "bhashinNote": "Enhanced Assamese speech recognition is available via BHASHINI when connected.",
     },
     {
         "languageCode": "hi-IN",

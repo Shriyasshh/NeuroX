@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta, timezone
-import os
 from app.config import DEMO_CAREGIVER_EMAIL, DEMO_CAREGIVER_PASSWORD, DEMO_PATIENT_EMAIL, DEMO_PATIENT_PASSWORD, SEED_DEMO_DATA
 from sqlalchemy.orm import Session
 from app.auth import hash_password

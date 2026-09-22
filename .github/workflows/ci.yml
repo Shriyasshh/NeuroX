@@ -88,6 +88,11 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: android-actions/setup-android@v3
+        with:
+          # The action's legacy default includes the removed SDK package
+          # named `tools`. Keep the CI SDK explicit and aligned with
+          # app/build.gradle.kts instead.
+          packages: platform-tools platforms;android-35 build-tools;35.0.0
       - uses: gradle/actions/setup-gradle@v4
       - run: ./gradlew --no-daemon assembleDebug testDebugUnitTest lintDebug assembleDebugAndroidTest assembleRelease
       - uses: actions/setup-python@v5

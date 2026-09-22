@@ -2,6 +2,10 @@ package org.neurox.patient
 
 import android.content.Context
 import android.content.Intent
+import android.annotation.SuppressLint
+import android.media.AudioFormat
+import android.media.AudioRecord
+import android.media.MediaRecorder
 import android.os.Bundle
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
@@ -10,15 +14,14 @@ import android.speech.tts.TextToSpeech
 import android.os.Handler
 import android.os.Looper
 import java.util.Locale
+import java.io.ByteArrayOutputStream
+import android.util.Base64
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONObject
 
 // ──────────────────────────────────────────────
 // Speech provider abstraction
@@ -223,163 +226,138 @@ class WhisperSpeechProvider(private val baseUrl: String? = null) : SpeechProvide
 }
 
 // ──────────────────────────────────────────────
-// BHASHINI provider (Indian government ASR)
+// Secure remote BHASHINI provider
 // ──────────────────────────────────────────────
 
 /**
- * Speech-to-text provider backed by BHASHINI (Ulca / AI4Bharat), the
- * Indian government's multilingual ASR platform.
- *
- * BHASHINI natively supports Indian regional languages — including Assamese,
- * Bengali, Hindi, Tamil, and others — that Android on-device ASR may not
- * handle well. This makes it the preferred provider for non-English Indian
- * patients in NeuroX.
- *
- * Configuration:
- *   - [apiKey]    — BHASHINI Ulca API key from https://bhashini.gov.in/ulca
- *   - [userId]    — Ulca user ID linked to the API key
- *   - [pipelineId] — Ulca ASR pipeline ID for the target language
- *
- * When [apiKey] is null (not yet configured), [isSupported] returns false and
- * the UI displays a clear fallback message. No crash, no silent failure.
- *
- * NOTE: Audio recording (PCM bytes) is handled by the calling layer. This
- * stub simulates a network call; real integration requires platform audio
- * capture and a brief (≤ 30 s) WAV/FLAC clip per request.
+ * Captures a short PCM clip, wraps it as WAV, and sends it to the authenticated
+ * NeuroX API. BHASHINI credentials never leave the server. The server checks
+ * patient consent and discards both audio and transcript after the response.
  */
-class BHASHINISpeechProvider(
-    private val apiKey: String? = null,
-    private val userId: String? = null,
-    private val pipelineId: String? = null
+class RemoteSpeechProvider(
+    private val transcribe: suspend (String, String) -> SpeechTranscriptionResponse,
 ) : SpeechProvider {
-
-    /** BCP-47 codes for languages BHASHINI Ulca can reliably transcribe. */
     private val supportedLanguageCodes = setOf(
-        "as-IN",  // Assamese — primary target for NeuroX Assamese patients
-        "brx-IN", // Bodo
-        "mni-IN", // Manipuri
-        "hi-IN",  // Hindi
-        "bn-IN",  // Bengali
-        "gu-IN",  // Gujarati
-        "kn-IN",  // Kannada
-        "ml-IN",  // Malayalam
-        "mr-IN",  // Marathi
-        "or-IN",  // Odia
-        "pa-IN",  // Punjabi
-        "ta-IN",  // Tamil
-        "te-IN",  // Telugu
-        "ur-IN"   // Urdu
+        "as-IN", "brx-IN", "mni-IN", "hi-IN", "bn-IN", "gu-IN", "kn-IN",
+        "ml-IN", "mr-IN", "or-IN", "pa-IN", "ta-IN", "te-IN", "ur-IN",
     )
+    private val scope = CoroutineScope(Dispatchers.IO)
+    @Volatile private var recorder: AudioRecord? = null
+    private var captureJob: Job? = null
 
-    private val client = OkHttpClient()
-    private var cancelled = false
+    override fun isSupported(languageCode: String): Boolean = languageCode in supportedLanguageCodes
 
-    /**
-     * Returns true only when:
-     * 1. The API key and user ID are configured (provider is usable), AND
-     * 2. The requested [languageCode] is in BHASHINI's supported set.
-     *
-     * This guarantees the UI never shows the mic button for a language
-     * that BHASHINI cannot transcribe.
-     */
-    override fun isSupported(languageCode: String): Boolean =
-        false // Audio capture/secure server integration is not implemented yet.
-
-    /**
-     * Submits a recognition request to the BHASHINI Ulca ASR pipeline.
-     *
-     * In this prototype the audio bytes are a fixed silent WAV placeholder;
-     * real integration wires platform audio capture here. The network call
-     * is dispatched on [Dispatchers.IO] and the result is returned on the
-     * main thread via [onResult] / [onError] callbacks.
-     *
-     * If the API key is not configured, [onError] is called immediately
-     * with a clear explanation.
-     */
+    @SuppressLint("MissingPermission")
     override fun startListening(
         languageCode: String,
         onResult: (RecognitionResult) -> Unit,
         onError: (String) -> Unit
     ) {
         if (!isSupported(languageCode)) {
-            onError(
-                if (apiKey == null)
-                    "BHASHINI API key is not configured. Contact the NeuroX team to enable regional-language voice support."
-                else
-                    "BHASHINI does not support speech recognition for language code $languageCode."
-            )
+            onError("Online speech recognition is not available for this language.")
             return
         }
-
-        cancelled = false
-
-        // Build a minimal Ulca ASR inference request.
-        // Payload structure follows the BHASHINI Ulca inference API v1 schema.
-        val payload = JSONObject().apply {
-            put("pipelineTasks", org.json.JSONArray().apply {
-                put(JSONObject().apply {
-                    put("taskType", "asr")
-                    put("config", JSONObject().apply {
-                        put("language", JSONObject().apply {
-                            put("sourceLanguage", languageCode.substringBefore("-"))
-                        })
-                        put("serviceId", pipelineId ?: "")
-                        put("audioFormat", "wav")
-                        put("samplingRate", 16000)
-                    })
-                })
-            })
-            // Audio bytes would be base64-encoded and placed here.
-            // Placeholder: empty audio for prototype stub.
-            put("inputData", JSONObject().apply {
-                put("audio", org.json.JSONArray().apply {
-                    put(JSONObject().apply { put("audioContent", "") })
-                })
-            })
+        stopListening()
+        val sampleRate = 16_000
+        val minimum = AudioRecord.getMinBufferSize(
+            sampleRate,
+            AudioFormat.CHANNEL_IN_MONO,
+            AudioFormat.ENCODING_PCM_16BIT,
+        )
+        if (minimum <= 0) {
+            onError("Microphone recording is unavailable on this device.")
+            return
         }
-
-        val body = payload.toString().toRequestBody("application/json".toMediaType())
-        val request = Request.Builder()
-            .url("https://dhruva-api.bhashini.gov.in/services/inference/pipeline")
-            .addHeader("Authorization", apiKey ?: "")
-            .addHeader("userID", userId ?: "")
-            .post(body)
-            .build()
-
-        CoroutineScope(Dispatchers.IO).launch {
+        val activeRecorder = AudioRecord(
+            MediaRecorder.AudioSource.VOICE_RECOGNITION,
+            sampleRate,
+            AudioFormat.CHANNEL_IN_MONO,
+            AudioFormat.ENCODING_PCM_16BIT,
+            minimum * 2,
+        )
+        if (activeRecorder.state != AudioRecord.STATE_INITIALIZED) {
+            activeRecorder.release()
+            onError("Microphone recording could not be started.")
+            return
+        }
+        recorder = activeRecorder
+        captureJob = scope.launch {
             try {
-                val response = client.newCall(request).execute()
-                if (cancelled) return@launch
-                if (!response.isSuccessful) {
-                    withContext(Dispatchers.Main) {
-                        onError("BHASHINI recognition failed (HTTP ${response.code}). Please try again.")
+                activeRecorder.startRecording()
+                val pcm = ByteArrayOutputStream()
+                val buffer = ShortArray(minimum / 2)
+                val startedAt = android.os.SystemClock.elapsedRealtime()
+                var speechStarted = false
+                var lastSpeechAt = startedAt
+                while (isActive && android.os.SystemClock.elapsedRealtime() - startedAt < 12_000L) {
+                    val count = activeRecorder.read(buffer, 0, buffer.size)
+                    if (count <= 0) continue
+                    var peak = 0
+                    repeat(count) { peak = maxOf(peak, kotlin.math.abs(buffer[it].toInt())) }
+                    val now = android.os.SystemClock.elapsedRealtime()
+                    if (peak >= 700) {
+                        speechStarted = true
+                        lastSpeechAt = now
                     }
+                    repeat(count) {
+                        val sample = buffer[it].toInt()
+                        pcm.write(sample and 0xff)
+                        pcm.write((sample shr 8) and 0xff)
+                    }
+                    if (speechStarted && now - lastSpeechAt >= 1_200L) break
+                    if (!speechStarted && now - startedAt >= 6_000L) break
+                }
+                activeRecorder.stop()
+                recorder = null
+                activeRecorder.release()
+                if (!speechStarted) {
+                    withContext(Dispatchers.Main) { onError("No speech detected. Please tap the microphone and speak.") }
                     return@launch
                 }
-                val body = response.body?.string() ?: ""
-                val json = JSONObject(body)
-                val transcript = json
-                    .optJSONArray("pipelineResponse")
-                    ?.optJSONObject(0)
-                    ?.optJSONArray("output")
-                    ?.optJSONObject(0)
-                    ?.optString("source", "")
-                    ?: ""
+                val wav = wav(pcm.toByteArray(), sampleRate)
+                val response = transcribe(Base64.encodeToString(wav, Base64.NO_WRAP), languageCode)
                 withContext(Dispatchers.Main) {
-                    if (transcript.isNotBlank()) onResult(RecognitionResult(transcript, confidence = null))
-                    else onError("BHASHINI returned an empty transcript. Please speak clearly and try again.")
+                    onResult(RecognitionResult(response.transcript, confidence = null))
                 }
             } catch (e: Exception) {
-                if (!cancelled) {
+                if (isActive) {
                     withContext(Dispatchers.Main) {
-                        onError("Could not reach BHASHINI. Please check your connection and try again.")
+                        val detail = e.message.orEmpty()
+                        onError(
+                            when {
+                                detail.contains("consent", ignoreCase = true) -> "Enable voice recognition in Privacy & sharing, then try again."
+                                else -> "Online speech recognition is unavailable. Check your connection and try again."
+                            }
+                        )
                     }
                 }
+            } finally {
+                if (recorder === activeRecorder) recorder = null
+                try { activeRecorder.release() } catch (_: Exception) {}
             }
         }
     }
 
-    override fun stopListening() { cancelled = true }
+    override fun stopListening() {
+        captureJob?.cancel()
+        captureJob = null
+        recorder?.let {
+            try { it.stop() } catch (_: Exception) {}
+            it.release()
+        }
+        recorder = null
+    }
+
+    private fun wav(pcm: ByteArray, sampleRate: Int): ByteArray {
+        val output = ByteArrayOutputStream(44 + pcm.size)
+        fun ascii(value: String) = output.write(value.toByteArray(Charsets.US_ASCII))
+        fun little(value: Int, bytes: Int) = repeat(bytes) { output.write((value shr (8 * it)) and 0xff) }
+        ascii("RIFF"); little(36 + pcm.size, 4); ascii("WAVEfmt ")
+        little(16, 4); little(1, 2); little(1, 2); little(sampleRate, 4)
+        little(sampleRate * 2, 4); little(2, 2); little(16, 2)
+        ascii("data"); little(pcm.size, 4); output.write(pcm)
+        return output.toByteArray()
+    }
 }
 
 // ──────────────────────────────────────────────
@@ -391,8 +369,8 @@ class BHASHINISpeechProvider(
  *
  * Priority:
  * 1. [MockSpeechProvider] when [demoMode] is true — deterministic, no hardware.
- * 2. [BHASHINISpeechProvider] when [bhashinApiKey] is set and the language
- *    is in BHASHINI's supported set — preferred for Indian regional languages.
+ * 2. [RemoteSpeechProvider] for supported Indian regional languages. It sends
+ *    audio to the authenticated NeuroX API; provider credentials stay server-side.
  * 3. [AndroidSpeechProvider] when the device has a recognition service — good
  *    for English and Hindi with Google services.
  * 4. [WhisperSpeechProvider] stub — always unavailable until a base URL is set.
@@ -400,22 +378,40 @@ class BHASHINISpeechProvider(
  * BHASHINI is placed above Android on-device recognition because it provides
  * far better accuracy for Assamese and other low-resource Indian languages.
  *
- * For the hackathon demo, [demoMode] should remain true so the app always
- * works without a microphone or an API key.
+ * Production always supplies [remoteTranscriber] and keeps [demoMode] false.
  */
 fun buildSpeechProvider(
     context: Context,
     demoMode: Boolean = true,
-    bhashinApiKey: String? = null,
-    bhashinUserId: String? = null,
-    bhashinPipelineId: String? = null
+    remoteTranscriber: (suspend (String, String) -> SpeechTranscriptionResponse)? = null,
 ): SpeechProvider = when {
     demoMode -> MockSpeechProvider()
-    bhashinApiKey != null -> BHASHINISpeechProvider(
-        apiKey = bhashinApiKey,
-        userId = bhashinUserId,
-        pipelineId = bhashinPipelineId
+    remoteTranscriber != null -> RoutedSpeechProvider(
+        remote = RemoteSpeechProvider(remoteTranscriber),
+        android = AndroidSpeechProvider(context),
     )
     SpeechRecognizer.isRecognitionAvailable(context) -> AndroidSpeechProvider(context)
     else -> WhisperSpeechProvider()
+}
+
+/** Prefer server-side BHASHINI for regional languages and Android for English. */
+class RoutedSpeechProvider(
+    private val remote: RemoteSpeechProvider,
+    private val android: AndroidSpeechProvider,
+) : SpeechProvider {
+    private var active: SpeechProvider? = null
+    override fun isSupported(languageCode: String): Boolean =
+        remote.isSupported(languageCode) || android.isSupported(languageCode)
+    override fun startListening(
+        languageCode: String,
+        onResult: (RecognitionResult) -> Unit,
+        onError: (String) -> Unit,
+    ) {
+        active = if (remote.isSupported(languageCode)) remote else android
+        active?.startListening(languageCode, onResult, onError)
+    }
+    override fun stopListening() {
+        active?.stopListening()
+        active = null
+    }
 }

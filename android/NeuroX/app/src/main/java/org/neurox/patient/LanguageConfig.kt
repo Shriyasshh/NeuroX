@@ -29,16 +29,11 @@ data class LanguageConfig(
     val ttsSupported: Boolean,
     val ttsFallbackNote: String? = null,
     /**
-     * True if BHASHINI Ulca ASR supports this language.
-     * When true and a BHASHINI API key is configured, [BHASHINISpeechProvider]
-     * will be preferred over Android on-device recognition for better regional-
-     * language accuracy.
+     * True if the server-side BHASHINI integration supports this language.
      */
     val bhashinSupported: Boolean = false,
     /**
-     * Shown in the listening screen when [bhashinSupported] is true but no
-     * BHASHINI API key is configured — tells the user why enhanced speech
-     * recognition is not active.
+     * Explains that enhanced recognition requires connectivity.
      */
     val bhashinNote: String? = null
 )
@@ -66,11 +61,11 @@ val SUPPORTED_LANGUAGES: List<LanguageConfig> = listOf(
     LanguageConfig(
         languageCode = "as-IN",
         languageName = "Assamese",
-        speechSupported = true,          // Supported via MockSpeechProvider / BHASHINISpeechProvider / AndroidSpeechProvider
+        speechSupported = true,          // Supported via server-side BHASHINI or Android speech
         ttsSupported = false,            // Android TTS does not ship an Assamese voice by default
         ttsFallbackNote = "Voice guides will use English until an Assamese voice pack is installed.",
         bhashinSupported = true,         // BHASHINI Ulca natively supports Assamese ASR
-        bhashinNote = "Enhanced Assamese speech recognition is available via BHASHINI. Configure a BHASHINI API key to activate it."
+        bhashinNote = "Enhanced Assamese speech recognition is available via BHASHINI when connected."
     ),
     LanguageConfig(
         languageCode = "hi-IN",

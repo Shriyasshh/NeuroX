@@ -29,6 +29,15 @@ class ProviderError(RuntimeError):
 
 
 def _post_json(url: str, payload: dict[str, Any], headers: dict[str, str], *, timeout: float) -> dict[str, Any]:
+    parsed = urllib.parse.urlsplit(url)
+    if (
+        parsed.scheme != "https"
+        or not parsed.hostname
+        or parsed.username
+        or parsed.password
+        or parsed.fragment
+    ):
+        raise ProviderError("http", "Provider URL must be a safe HTTPS URL.", retryable=False)
     request = urllib.request.Request(
         url,
         data=json.dumps(payload).encode("utf-8"),
@@ -36,7 +45,8 @@ def _post_json(url: str, payload: dict[str, Any], headers: dict[str, str], *, ti
         method="POST",
     )
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
+        # URL scheme, host, and credentials were validated immediately above.
+        with urllib.request.urlopen(request, timeout=timeout) as response:  # nosec B310
             raw = response.read().decode("utf-8")
             if response.status < 200 or response.status >= 300:
                 raise ProviderError("http", "Provider rejected the request.", retryable=response.status >= 500)
@@ -64,6 +74,10 @@ class BhashiniASR:
     inference_url: str
     timeout_seconds: float = 20.0
 
+    SUPPORTED_LANGUAGES = {
+        "as", "bn", "brx", "gu", "hi", "kn", "ml", "mni", "mr", "or", "pa", "ta", "te", "ur"
+    }
+
     @classmethod
     def from_environment(cls) -> "BhashiniASR":
         if os.getenv("BHASHINI_ENABLED", "false").lower() != "true":
@@ -82,6 +96,8 @@ class BhashiniASR:
         if len(audio) > 20 * 1024 * 1024:
             raise ProviderError("bhashini", "Audio payload exceeds the safe request limit.", retryable=False)
         language = language_code.split("-", 1)[0].lower()
+        if language not in self.SUPPORTED_LANGUAGES:
+            raise ProviderError("bhashini", "The requested language is not enabled for BHASHINI.", retryable=False)
         payload = {
             "pipelineTasks": [{"taskType": "asr", "config": {"language": {"sourceLanguage": language}, "serviceId": self.pipeline_id, "audioFormat": audio_format, "samplingRate": sampling_rate}}],
             "inputData": {"audio": [{"audioContent": base64.b64encode(audio).decode("ascii")}]},

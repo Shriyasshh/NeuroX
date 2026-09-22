@@ -606,7 +606,7 @@ internal fun Profile(
             }
             Text("Other consent choices", fontWeight = FontWeight.SemiBold, color = Ink)
             listOf(
-                "voice_recording" to "Store voice recordings",
+                "voice_recording" to "Use my voice for speech recognition",
                 "notifications" to "Send caregiver notifications",
                 "personalization" to "Personalize activities",
                 "cognitive_screening" to "Allow research cognitive estimates",

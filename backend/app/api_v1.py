@@ -17,6 +17,7 @@ from app.routers.reports import router as reports_router
 from app.routers.safety import router as safety_router
 from app.routers.cognitive import router as cognitive_router
 from app.routers.sync import router as sync_router
+from app.routers.speech import router as speech_router
 from app.rate_limit import login_limit, recovery_limit, registration_limit
 from app.schemas import AuthResponse
 from app.services import account_recovery, authentication
@@ -117,4 +118,5 @@ router.include_router(notifications_router)
 router.include_router(safety_router)
 router.include_router(cognitive_router)
 router.include_router(sync_router)
+router.include_router(speech_router)
 router.include_router(privacy_router)

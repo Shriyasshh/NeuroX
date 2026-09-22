@@ -61,6 +61,8 @@ def send_phone_code(phone_number: str, code: str) -> None:
         },
         method="POST",
     )
-    with urllib.request.urlopen(request, timeout=10) as response:
+    # The gateway is required to begin with https:// above; no local/file URL
+    # can reach this sink.
+    with urllib.request.urlopen(request, timeout=10) as response:  # nosec B310
         if response.status < 200 or response.status >= 300:
             raise RuntimeError("Phone verification provider rejected the request.")

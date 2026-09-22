@@ -45,6 +45,13 @@ data class LocationSharingResponse(val enabled: Boolean, val message: String)
 data class RevocationResponse(val revoked: Boolean, val caregiverId: String)
 data class ConsentUpdateRequest(val purpose: String, val granted: Boolean, @SerializedName("notice_version") val noticeVersion: String = "phase1-v1")
 data class ConsentUpdateResponse(val purpose: String, val granted: Boolean, val noticeVersion: String)
+data class SpeechTranscriptionRequest(
+    @SerializedName("audio_base64") val audioBase64: String,
+    @SerializedName("language_code") val languageCode: String,
+    @SerializedName("audio_format") val audioFormat: String = "wav",
+    @SerializedName("sampling_rate") val samplingRate: Int = 16000,
+)
+data class SpeechTranscriptionResponse(val transcript: String, val provider: String, val retained: Boolean)
 
 interface NeuroXApi {
     @POST("api/v1/auth/login") suspend fun login(@Body request: LoginRequest): AuthResponse
@@ -67,4 +74,5 @@ interface NeuroXApi {
     @GET("api/v1/patients/me/caregivers") suspend fun caregivers(): List<CaregiverAccess>
     @DELETE("api/v1/patients/me/caregivers/{caregiverId}") suspend fun revokeCaregiver(@Path("caregiverId") caregiverId: String): RevocationResponse
     @PUT("api/v1/patients/me/privacy/consents") suspend fun setConsent(@Body request: ConsentUpdateRequest): ConsentUpdateResponse
+    @POST("api/v1/speech/transcriptions") suspend fun transcribeSpeech(@Body request: SpeechTranscriptionRequest): SpeechTranscriptionResponse
 }

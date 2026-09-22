@@ -106,7 +106,13 @@ fun PatientApp(repository: PatientRepository) {
             }
         } else locationPermission.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
     }
-    val speechProvider = remember { buildSpeechProvider(context, demoMode = false) }
+    val speechProvider = remember(repository) {
+        buildSpeechProvider(
+            context,
+            demoMode = false,
+            remoteTranscriber = repository::transcribeSpeech,
+        )
+    }
     val languageCode = remember(ui.preferredLanguage) { languageNameToCode(ui.preferredLanguage) }
     val languageConfig = remember(languageCode, speechProvider) {
         languageConfigFor(languageCode).copy(

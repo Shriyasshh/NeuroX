@@ -34,6 +34,8 @@ interface PatientRepository {
         error("Privacy controls are unavailable.")
     suspend fun setConsent(purpose: String, granted: Boolean): ConsentUpdateResponse =
         error("Consent controls are unavailable.")
+    suspend fun transcribeSpeech(audioBase64: String, languageCode: String): SpeechTranscriptionResponse =
+        error("Online speech recognition is unavailable.")
 }
 
 data class RemoteData(

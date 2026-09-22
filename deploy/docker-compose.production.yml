@@ -37,6 +37,11 @@ services:
       SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
       SMS_GATEWAY_URL: ${SMS_GATEWAY_URL:-}
       SMS_GATEWAY_TOKEN_FILE: /run/secrets/sms_gateway_token
+      BHASHINI_ENABLED: "true"
+      BHASHINI_USER_ID: ${BHASHINI_USER_ID:?set BHASHINI_USER_ID}
+      BHASHINI_API_KEY_FILE: /run/secrets/bhashini_api_key
+      BHASHINI_PIPELINE_ID: ${BHASHINI_PIPELINE_ID:?set BHASHINI_PIPELINE_ID}
+      BHASHINI_INFERENCE_URL: ${BHASHINI_INFERENCE_URL:-https://dhruva-api.bhashini.gov.in/services/inference/pipeline}
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
       COGNITIVE_MODEL_PATH: /run/models/lasi_low_recall_calibrated.joblib
       COGNITIVE_MODEL_SHA256: ${COGNITIVE_MODEL_SHA256:?set COGNITIVE_MODEL_SHA256}
@@ -46,6 +51,7 @@ services:
       - jwt_secret
       - smtp_password
       - sms_gateway_token
+      - bhashini_api_key
     volumes:
       - ${COGNITIVE_MODEL_HOST_PATH:?set COGNITIVE_MODEL_HOST_PATH}:/run/models/lasi_low_recall_calibrated.joblib:ro
     depends_on:
@@ -114,11 +120,13 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:?set REDIS_PASSWORD}"]
+    command: ["/bin/sh", "-c", "exec redis-server --appendonly yes --requirepass \"$$(cat /run/secrets/redis_password)\""]
+    secrets:
+      - redis_password
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli -a '${REDIS_PASSWORD}' ping | grep PONG"]
+      test: ["CMD-SHELL", "redis-cli -a \"$$(cat /run/secrets/redis_password)\" ping | grep PONG"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -154,21 +162,25 @@ services:
 
 secrets:
   database_url:
-    external: true
+    file: ${NEUROX_SECRETS_DIR:?set NEUROX_SECRETS_DIR}/database_url
   redis_url:
-    external: true
+    file: ${NEUROX_SECRETS_DIR:?set NEUROX_SECRETS_DIR}/redis_url
   jwt_secret:
-    external: true
+    file: ${NEUROX_SECRETS_DIR:?set NEUROX_SECRETS_DIR}/jwt_secret
   smtp_password:
-    external: true
+    file: ${NEUROX_SECRETS_DIR:?set NEUROX_SECRETS_DIR}/smtp_password
   sms_gateway_token:
-    external: true
+    file: ${NEUROX_SECRETS_DIR:?set NEUROX_SECRETS_DIR}/sms_gateway_token
+  bhashini_api_key:
+    file: ${NEUROX_SECRETS_DIR:?set NEUROX_SECRETS_DIR}/bhashini_api_key
   postgres_password:
-    external: true
+    file: ${NEUROX_SECRETS_DIR:?set NEUROX_SECRETS_DIR}/postgres_password
+  redis_password:
+    file: ${NEUROX_SECRETS_DIR:?set NEUROX_SECRETS_DIR}/redis_password
   minio_access_key:
-    external: true
+    file: ${NEUROX_SECRETS_DIR:?set NEUROX_SECRETS_DIR}/minio_access_key
   minio_secret_key:
-    external: true
+    file: ${NEUROX_SECRETS_DIR:?set NEUROX_SECRETS_DIR}/minio_secret_key
 
 volumes:
   postgres_data:

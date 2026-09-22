@@ -8,13 +8,20 @@ and initial availability/error-rate alerts.
 
 ## Required setup
 
-1. Create separate production secrets named `database_url`, `redis_url`,
-   `jwt_secret`, `smtp_password`, `sms_gateway_token`, `postgres_password`,
-   `minio_access_key`, and `minio_secret_key` in the deployment platform. Never
-   commit their values.
-2. Set `NEUROX_DOMAIN`, SMTP sender/host, SMS gateway URL, and a Redis password in
+1. Create an operator-owned directory outside the repository, set
+   `NEUROX_SECRETS_DIR` to its absolute path, and add mode-`0600` files named
+   `database_url`, `redis_url`, `jwt_secret`, `smtp_password`,
+   `sms_gateway_token`, `bhashini_api_key`, `postgres_password`,
+   `redis_password`, `minio_access_key`, and `minio_secret_key`. Never commit
+   this directory. On Kubernetes or another orchestrator, map the same names
+   from its managed secret store instead.
+2. Set `NEUROX_DOMAIN`, SMTP sender/host, SMS gateway URL, BHASHINI user ID and
+   pipeline ID in
    the deployment environment. The URLs stored in the database/Redis secrets must
    match those credentials.
+   The Android app sends short authenticated WAV clips to NeuroX; BHASHINI
+   credentials remain server-side. Transcription requires the patient's
+   `voice_recording` consent, and the API does not retain audio or transcripts.
    Set `COGNITIVE_MODEL_HOST_PATH` to the absolute path of the calibrated model
    artifact and `COGNITIVE_MODEL_SHA256` to its SHA-256 digest. The API refuses
    readiness if the mounted artifact is absent or has a different digest.

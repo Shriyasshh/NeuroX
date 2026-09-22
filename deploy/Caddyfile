@@ -1,6 +1,15 @@
 {$NEUROX_DOMAIN} {
-    encode zstd gzip
-    @api path /api/* /auth/* /health /ready /language-config
-    reverse_proxy @api backend:8000
-    reverse_proxy web:8080
+	encode zstd gzip
+	request_body {
+		max_size 2MB
+	}
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+	@api path /api/* /auth/* /health /ready /language-config
+	reverse_proxy @api backend:8000
+	reverse_proxy web:8080
 }

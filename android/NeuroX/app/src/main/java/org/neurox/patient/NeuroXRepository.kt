@@ -85,6 +85,8 @@ class NeuroXRepository internal constructor(
     override suspend fun setLocationSharing(enabled: Boolean) = api.setLocationSharing(LocationSharingRequest(enabled))
     override suspend fun revokeCaregiver(caregiverId: String) = api.revokeCaregiver(caregiverId)
     override suspend fun setConsent(purpose: String, granted: Boolean) = api.setConsent(ConsentUpdateRequest(purpose, granted))
+    override suspend fun transcribeSpeech(audioBase64: String, languageCode: String) =
+        api.transcribeSpeech(SpeechTranscriptionRequest(audioBase64, languageCode))
     suspend fun loadSafety() = api.safety(patientId())
     override fun schedulePendingSync() = enqueueSync()
     override suspend fun retryFailedSync() = withContext(Dispatchers.IO) {
