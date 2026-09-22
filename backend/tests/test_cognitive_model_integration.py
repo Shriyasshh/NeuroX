@@ -1,7 +1,60 @@
+from app.auth import hash_password
+from app.database import SessionLocal
+from app.main import app
+from app.models import CaregiverPatientAssignment, Patient, User
+from app.routers import cognitive
+from app.schemas import Role
 from fastapi.testclient import TestClient
 
-from app.main import app
-from app.routers import cognitive
+
+def _ensure_screening_fixture() -> None:
+    """Make this integration test independent of demo-seed/test ordering."""
+    with SessionLocal() as db:
+        patient = db.get(User, "maya-demo")
+        if patient is None:
+            patient = User(
+                id="maya-demo",
+                name="Maya Devi",
+                email="maya@neurox.demo",
+                role=Role.PATIENT.value,
+                password_hash=hash_password("NeuroXDemo!2026"),
+            )
+            db.add(patient)
+        else:
+            patient.email = "maya@neurox.demo"
+            patient.role = Role.PATIENT.value
+            patient.password_hash = hash_password("NeuroXDemo!2026")
+
+        caregiver = db.get(User, "caregiver-anita")
+        if caregiver is None:
+            caregiver = db.query(User).filter(User.email == "anita@neurox.demo").first()
+        if caregiver is None:
+            caregiver = User(
+                id="caregiver-anita",
+                name="Anita Devi",
+                email="anita@neurox.demo",
+                role=Role.CAREGIVER.value,
+                password_hash=hash_password("NeuroXDemo!2026"),
+            )
+            db.add(caregiver)
+        else:
+            caregiver.email = "anita@neurox.demo"
+            caregiver.role = Role.CAREGIVER.value
+            caregiver.password_hash = hash_password("NeuroXDemo!2026")
+
+        db.flush()
+        if db.get(Patient, "maya-demo") is None:
+            db.add(Patient(user_id="maya-demo", age=72, preferred_language="Assamese"))
+        assignment = db.query(CaregiverPatientAssignment).filter_by(
+            caregiver_id=caregiver.id, patient_id="maya-demo"
+        ).first()
+        if assignment is None:
+            db.add(CaregiverPatientAssignment(
+                caregiver_id=caregiver.id, patient_id="maya-demo", active=True
+            ))
+        else:
+            assignment.active = True
+        db.commit()
 
 
 def _auth(client: TestClient, email: str) -> dict[str, str]:
@@ -14,6 +67,7 @@ def _auth(client: TestClient, email: str) -> dict[str, str]:
 
 
 def test_screening_requires_consent_and_returns_research_only_result(monkeypatch):
+    _ensure_screening_fixture()
     monkeypatch.setattr(cognitive, "predict", lambda _: {
         "low_delayed_recall_probability": 0.31,
         "model": "test-model-v1",

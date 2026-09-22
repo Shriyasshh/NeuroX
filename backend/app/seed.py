@@ -1,7 +1,16 @@
+import os
 from datetime import datetime, timedelta, timezone
-from app.config import DEMO_CAREGIVER_EMAIL, DEMO_CAREGIVER_PASSWORD, DEMO_PATIENT_EMAIL, DEMO_PATIENT_PASSWORD, SEED_DEMO_DATA
+
 from sqlalchemy.orm import Session
+
 from app.auth import hash_password
+from app.config import (
+    DEMO_CAREGIVER_EMAIL,
+    DEMO_CAREGIVER_PASSWORD,
+    DEMO_PATIENT_EMAIL,
+    DEMO_PATIENT_PASSWORD,
+    SEED_DEMO_DATA,
+)
 from app.database import Base, engine
 from app.models import (
     CaregiverPatientAssignment,
@@ -12,14 +21,15 @@ from app.models import (
     SafetySettings,
     User,
 )
-from app.schemas import (
-    Role,
-)
+from app.schemas import Role
 
 
 def _seed_database() -> None:
     """Idempotent development fixture seed; never runs outside development."""
-    if not SEED_DEMO_DATA:
+    # Evaluate APP_ENV at call time as well as at import time.  This keeps a
+    # long-running process (and tests that change the environment) from ever
+    # creating tables or seeding fixtures after it has entered production.
+    if os.getenv("APP_ENV", "development").lower() != "development" or not SEED_DEMO_DATA:
         return
     Base.metadata.create_all(bind=engine)
     with Session(bind=engine) as db:
