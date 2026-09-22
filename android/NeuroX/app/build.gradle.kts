@@ -6,13 +6,33 @@ android { namespace = "org.neurox.patient"; compileSdk = 35
         minSdk = 26
         targetSdk = 35
         versionCode = 1
-        versionName = "0.1"
+        versionName = "1.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildFeatures { compose = true; buildConfig = true }
     buildTypes {
         debug { buildConfigField("String", "DEFAULT_API_URL", "\"http://10.0.2.2:8000/\"") }
-        release { buildConfigField("String", "DEFAULT_API_URL", "\"\"") }
+    release {
+        buildConfigField("String", "DEFAULT_API_URL", "\"\"")
+        val signingStoreFile = System.getenv("ANDROID_KEYSTORE_FILE")
+        val signingStorePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+        val signingKeyAlias = System.getenv("ANDROID_KEY_ALIAS")
+        val signingKeyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+        val signingConfigured = listOf(
+            signingStoreFile,
+            signingStorePassword,
+            signingKeyAlias,
+            signingKeyPassword,
+        ).all { !it.isNullOrBlank() }
+        if (signingConfigured) {
+            signingConfig = signingConfigs.create("release") {
+                storeFile = file(signingStoreFile!!)
+                storePassword = signingStorePassword
+                keyAlias = signingKeyAlias
+                keyPassword = signingKeyPassword
+            }
+        }
+    }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

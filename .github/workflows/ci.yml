@@ -3,6 +3,13 @@ name: NeuroX checks
 on:
   push:
   pull_request:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing or new version tag to build (for example v1.0.0)
+        required: true
+        default: v1.0.0
+        type: string
 
 permissions:
   contents: read
@@ -105,3 +112,65 @@ jobs:
         with:
           name: neurox-debug-apk
           path: android/NeuroX/app/build/outputs/apk/debug/*.apk
+
+  android-release:
+    name: Publish Android release
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && startsWith(inputs.release_tag, 'v'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: android/NeuroX
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_tag || github.ref }}
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools platforms;android-35 build-tools;35.0.0
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Validate release secrets
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          test -n "$KEYSTORE" || { echo "ANDROID_KEYSTORE_BASE64 is required"; exit 1; }
+          test -n "$STORE_PASSWORD" || { echo "ANDROID_KEYSTORE_PASSWORD is required"; exit 1; }
+          test -n "$KEY_ALIAS" || { echo "ANDROID_KEY_ALIAS is required"; exit 1; }
+          test -n "$KEY_PASSWORD" || { echo "ANDROID_KEY_PASSWORD is required"; exit 1; }
+      - name: Decode signing keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/neurox-release.jks"
+      - name: Build signed APK and Play Store bundle
+        env:
+          ANDROID_KEYSTORE_FILE: ${{ runner.temp }}/neurox-release.jks
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./gradlew --no-daemon clean assembleRelease bundleRelease
+      - name: Publish GitHub release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
+        run: |
+          apk="NeuroX-${RELEASE_TAG}.apk"
+          bundle="NeuroX-${RELEASE_TAG}.aab"
+          cp app/build/outputs/apk/release/app-release.apk "$apk"
+          cp app/build/outputs/bundle/release/app-release.aab "$bundle"
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "$apk" "$bundle" --clobber
+          else
+            gh release create "$RELEASE_TAG" "$apk" "$bundle" \
+              --title "NeuroX ${RELEASE_TAG}" \
+              --generate-notes
+          fi
