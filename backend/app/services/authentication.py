@@ -13,7 +13,7 @@ from app.auth import (
     hash_password,
     verify_password,
 )
-from app.config import APP_ENV, CORS_ORIGINS, REQUIRE_EMAIL_VERIFICATION
+from app.config import APP_ENV, BROWSER_COOKIE_SAMESITE, CORS_ORIGINS, REQUIRE_EMAIL_VERIFICATION
 from app.database import get_db
 from app.models import AuditEvent, RefreshSession, User
 from app.schemas import (
@@ -418,7 +418,7 @@ def browser_session(data: AuthResponse, response: Response) -> dict:
         data.refresh_token,
         httponly=True,
         secure=APP_ENV != "development",
-        samesite="strict",
+        samesite=BROWSER_COOKIE_SAMESITE,
         path=COOKIE_PATH,
         max_age=REFRESH_TOKEN_EXPIRE_DAYS * 86400,
     )
@@ -492,7 +492,7 @@ def browser_logout(request: Request, response: Response, db: Session = Depends(g
         path=COOKIE_PATH,
         httponly=True,
         secure=APP_ENV != "development",
-        samesite="strict",
+        samesite=BROWSER_COOKIE_SAMESITE,
     )
     response.headers["Cache-Control"] = "no-store"
     return {"loggedOut": True}

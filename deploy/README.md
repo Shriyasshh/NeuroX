@@ -25,6 +25,9 @@ and initial availability/error-rate alerts.
    Set `COGNITIVE_MODEL_HOST_PATH` to the absolute path of the calibrated model
    artifact and `COGNITIVE_MODEL_SHA256` to its SHA-256 digest. The API refuses
    readiness if the mounted artifact is absent or has a different digest.
+   If the caregiver dashboard is hosted on a different site than the API,
+   set `BROWSER_COOKIE_SAMESITE=none`; the API still validates the dashboard
+   `Origin` for every browser-session endpoint.
 3. Validate the compose model, build immutable images, run the one-shot `migrate`
    job, then start the remaining services. Confirm `/health`, `/ready`, and the
    dashboard through the public HTTPS hostname.

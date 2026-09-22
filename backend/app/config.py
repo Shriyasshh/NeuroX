@@ -22,6 +22,9 @@ RATE_LIMIT_ENABLED = (
     APP_ENV in {"staging", "production"}
     or os.getenv("RATE_LIMIT_ENABLED", "false").lower() == "true"
 )
+BROWSER_COOKIE_SAMESITE = os.getenv("BROWSER_COOKIE_SAMESITE", "strict").lower()
+if BROWSER_COOKIE_SAMESITE not in {"strict", "lax", "none"}:
+    raise RuntimeError("BROWSER_COOKIE_SAMESITE must be strict, lax, or none.")
 # Demo fixtures are strictly a development convenience. They are disabled for
 # every non-development environment, regardless of the value supplied here.
 SEED_DEMO_DATA = APP_ENV == "development" and os.getenv("SEED_DEMO_DATA", "true").lower() == "true"
