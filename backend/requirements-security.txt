@@ -1,3 +1,5 @@
 ruff==0.16.6
 bandit==1.9.4
 pip-audit==2.10.1
+# Required by the CI runner and patched for PYSEC-2026-3447.
+setuptools>=83.0.0
